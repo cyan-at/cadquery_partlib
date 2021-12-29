@@ -1,5 +1,9 @@
 #!/usr/bin/env python3
 
+'''
+USAGE: ./slot_with_holes.py --holes_l 2 --holes_r 1 --o name_of_part
+'''
+
 import numpy as np
 
 import cadquery as cq
