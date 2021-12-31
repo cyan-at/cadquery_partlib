@@ -35,8 +35,19 @@ def parse_polarcoords(coord_str):
         print(str(e))
         return []
 
-def polar_to_cartesian(r, theta_rad):
-    return r * np.cos(theta_rad), r * np.sin(theta_rad)
+def parse_cartesian(coord_str):
+    '''
+        all valid or nothing for now
+    '''
+    try:
+        tokens = list(filter(lambda x: len(x) > 0, coord_str.split(";")))
+        return [[float(x) for x in t.split(",")] for t in tokens]
+    except Exception as e:
+        print(str(e))
+        return []
+
+def polar_to_cartesian(x, y, r, theta_rad):
+    return x + r * np.cos(theta_rad), y + r * np.sin(theta_rad)
 
 # generator funcs
 
@@ -63,8 +74,9 @@ def holes_along_axis_00(
     # left axis_proxy
     holes =\
         np.ones((num_holes, len(axis_proxy))) * axis_proxy
-    holes[:, axis_dim] = hole_variants
+    holes[:, axis_dim] = -1.0 * hole_variants
     
     return workplane.moveTo(0.0, 0.0)\
     .pushPoints(holes.tolist())\
     .hole(d)
+    # .circle(d / 2).extrude(1.0)
