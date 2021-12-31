@@ -13,9 +13,15 @@ USAGE: ./polar_hole_plate.py
         theta = 0 being '12 o'clock'
     --aux2 <list of cartesian coords> (x, y, diameter, depth)
 i.e.
+
 --o tarotmount00 --scale 1.000 --ri 6.000 --ro 25.000 --t 10.000 --h1 25.000 --h2 10.000 --h3 20.000 --smode 90 --s1 5.000 --ns 3 --s2 3.000 --aux "16.0,0.0,3.0,-0.5;16.0,2.0944,3.0,-0.5;16.0,-2.0944,3.0,-0.5" --aux2 ""
 
 --o tarotmount01 --scale 1.000 --ri 5.000 --ro 25.000 --t 10.000 --h1 25.000 --h2 10.000 --h3 20.000 --smode 90 --s1 5.000 --ns 3 --s2 3.000 --aux " 12.7,1.06,3.0,-0.5;12.7,-1.06,3.0,-0.5" --aux2 " -15.75,-10.48,3.0,-0.5;-15.75,10.48,3.0,-0.5"
+
+
+--o dremelmount00 --scale 1.000 --ri_mode circle --ri 10 --ro 35.000 --t 20.000 --h1 10.000 --h2 10.000 --h3 20.000 --smode 90 --s1 10.000 --ns 3 --s2 3.000 --aux " " --aux2 " "
+
+--o dremelmount01 --scale 1.000 --ri_mode ellipse --ri 25,27 --ro 35.000 --t 20.000 --h1 10.000 --h2 10.000 --h3 20.000 --smode 90 --s1 10.000 --ns 3 --s2 3.000 --aux " " --aux2 " "
 '''
 
 import numpy as np
@@ -26,29 +32,38 @@ from cadquery_common import *
 
 import argparse
 
+def parse_ri(ri_mode, ri_data):
+    if (ri_mode == "circle"):
+        return float(ri_data)
+    elif (ri_mode == "ellipse"):
+        return np.array([float(x) for x in ri_data.split(",")])
+    return None
+
 ####################################################################
 
 parser = argparse.ArgumentParser()
 parser.add_argument('--scale',
     type=float,
-    default=1.0,
-    required=False)
+    default=1.0)
 parser.add_argument('--o',
     type=str,
-    default='tarotmount01')
+    default='dremelmount00')
 
+parser.add_argument('--ri_mode',
+    type=str,
+    default="circle")
 parser.add_argument('--ri',
-    type=float,
-    default=5.0)
+    type=str,
+    default="10") # width, height
 parser.add_argument('--ro',
     type=float,
-    default=25.0)
+    default=35.0)
 parser.add_argument('--t',
     type=float,
-    default=10.0)
+    default=20.0)
 parser.add_argument('--h1',
     type=float,
-    default=25.0)
+    default=10.0)
 
 parser.add_argument('--h2',
     type=float,
@@ -62,7 +77,7 @@ parser.add_argument('--smode',
     default="90")
 parser.add_argument('--s1',
     type=float,
-    default=5.0)
+    default=10.0)
 parser.add_argument('--ns',
     type=int,
     default=3)
@@ -72,18 +87,19 @@ parser.add_argument('--s2',
 
 parser.add_argument('--aux',
     type=str,
-    default="12.7,1.06,3.0,-0.5;12.7,-1.06,3.0,-0.5")
+    default="")
 
 parser.add_argument('--aux2',
     type=str,
-    default="-15.75,-10.48,3.0,-0.5;-15.75,10.48,3.0,-0.5")
+    default="")
 
 args = parser.parse_args()
 # report yourself for memento
 # need a space in front of aux / aux2 to safely parse negative strings
-print("--o %s --scale %.3f --ri %.3f --ro %.3f --t %.3f --h1 %.3f --h2 %.3f --h3 %.3f --smode %s --s1 %.3f --ns %d --s2 %.3f --aux \" %s\" --aux2 \" %s\""\
+print("--o %s --scale %.3f --ri_mode %s --ri %s --ro %.3f --t %.3f --h1 %.3f --h2 %.3f --h3 %.3f --smode %s --s1 %.3f --ns %d --s2 %.3f --aux \" %s\" --aux2 \" %s\""\
       % (args.o,
          args.scale,
+         args.ri_mode,
          args.ri,
          args.ro,
          args.t,
@@ -107,7 +123,7 @@ cartesian_coords = np.array(cartesian_coords) * args.scale
 
 # dimensions, in mm, cadquery works in meters
 dims = {
-    "ri": args.ri, # inner hole, if 0 ignore
+    "ri": parse_ri(args.ri_mode, args.ri), # inner hole, if 0 ignore
     "ro" : args.ro, # extrusion radius
     "t": args.t, # thickness
     "h1": args.h1, # height of plate under the circular part
@@ -140,12 +156,20 @@ result = result.faces(">Z").workplane()\
     .moveTo(l, dims["ro"])\
     .circle(dims["ro"])\
     .extrude(-dims["t"])
-# make circle hole
+
+# make central hole
 result = result.faces(">Z").workplane()\
-    .moveTo(l, dims["ro"])\
-    .hole(dims["ri"] * 2)
+    .moveTo(l, dims["ro"])
+
+if args.ri_mode == "circle":
+    result = result.hole(dims["ri"] * 2)
+elif args.ri_mode == "ellipse":
+    result = result.ellipse(
+        x_radius=dims["ri"][0],
+        y_radius=dims["ri"][1], rotation_angle=0.0).cutBlind("last")
+
 # make polar coord holes
-for coord in polar_coords:    
+for coord in polar_coords:
     # (r, theta, diameter, depth), theta = 0 being 'right'
     x, y = polar_to_cartesian(
         dims["ro"] + dims["h1"], dims["ro"], coord[0], coord[1])
