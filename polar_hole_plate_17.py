@@ -80,6 +80,7 @@ parser.add_argument('--aux2',
 
 args = parser.parse_args()
 # report yourself for memento
+# need a space in front of aux / aux2 to safely parse negative strings
 print("--o %s --scale %.3f --ri %.3f --ro %.3f --t %.3f --h1 %.3f --h2 %.3f --h3 %.3f --smode %s --s1 %.3f --ns %d --s2 %.3f --aux \" %s\" --aux2 \" %s\""\
       % (args.o,
          args.scale,
