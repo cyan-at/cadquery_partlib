@@ -80,3 +80,7 @@ def holes_along_axis_00(
     .pushPoints(holes.tolist())\
     .hole(d)
     # .circle(d / 2).extrude(1.0)
+
+def make_teardrop(
+    workplane):
+    pass

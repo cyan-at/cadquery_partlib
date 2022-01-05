@@ -1,4 +1,4 @@
-# cadquery_partlib
+# cqpl
 
 todo:
 * polar_hole_plate_17.py
