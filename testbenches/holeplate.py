@@ -23,7 +23,7 @@ parser.add_argument('--scale',
     required=False)
 parser.add_argument('--o',
     type=str,
-    default='')
+    default='routerplate_pilot')
 
 ####################################################################
 
@@ -37,7 +37,26 @@ args = parser.parse_args()
 
 #################################################################### deserialize, resolve all parameters
 
-cartesian_data = np.array(parse_cartesian(args.holes.strip()))
+cartesian_data = np.array(Util.parse_float_str(args.holes.strip()))
+
+center_xy2 = [25.0, 35.0]
+cartesian_data = np.vstack([cartesian_data, 
+    np.array([[center_xy2[0] - 10.0, center_xy2[1] - 10.0, 3.0, -0.5],
+    [center_xy2[0] - 10.0, center_xy2[1] + 10.0, 3.0, -0.5],
+    [center_xy2[0] + 10.0, center_xy2[1] - 10.0, 3.0, -0.5],
+    [center_xy2[0] + 10.0, center_xy2[1] + 10.0, 3.0, -0.5]])
+])
+
+center_xy = [25.0, 0] # can't use 15 because of singularity somewhere?
+spacing_x = 25.0
+spacing_y = 20.0
+delta = np.array([[center_xy[0] - spacing_x, center_xy[1] - spacing_y, 3.0, -0.5],
+    [center_xy[0] - spacing_x, center_xy[1] + spacing_y, 3.0, -0.5],
+    [center_xy[0] + spacing_x, center_xy[1] - spacing_y, 3.0, -0.5],
+    [center_xy[0] + spacing_x, center_xy[1] + spacing_y, 3.0, -0.5]])
+print(delta)
+cartesian_data = np.vstack([cartesian_data, delta])
+
 cartesian_coords = cartesian_data[:, :2] * args.scale
 
 # dimensions, in mm, cadquery works in meters
@@ -80,4 +99,20 @@ for coord in cartesian_data:
         .pushPoints([[x, y]])\
         .hole(coord[2])
 
-show_object(result)
+slot_center_xy = center_xy2
+slot_center_xy[1] += 20.0
+result = result.faces(">Z").workplane()\
+    .pushPoints([slot_center_xy])\
+    .slot2D(30.0, 10.0, 90.0).cutBlind("last")
+
+#################################################################### produce
+
+try:
+    cq.cqgi.ScriptCallback.show_object(result)
+except:
+    pass
+
+if len(args.o) > 0:
+    cq.exporters.export(result,"./%s.stl" % (args.o))
+    cq.exporters.export(result.section(),"./%s.dxf" % (args.o))
+    print("saved %s" % (args.o))

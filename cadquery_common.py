@@ -25,30 +25,19 @@ cm_to_m = 1 / 100.0
 in_to_mm = 25.4
 mm_to_in = 0.0393701
 
-def parse_polarcoords(coord_str):
-    '''
-        all valid or nothing for now
-    '''
-    try:
-        tokens = list(filter(lambda x: len(x) > 0, coord_str.split(";")))
-        return [[float(x) for x in t.split(",")] for t in tokens]
-    except Exception as e:
-        print(str(e))
-        return []
-
-def parse_cartesian(coord_str):
-    '''
-        all valid or nothing for now
-    '''
-    try:
-        tokens = list(filter(lambda x: len(x) > 0, coord_str.split(";")))
-        return [[float(x) for x in t.split(",")] for t in tokens]
-    except Exception as e:
-        print(str(e))
-        return []
-
-def polar_to_cartesian(x, y, r, theta_rad):
-    return x + r * np.cos(theta_rad), y + r * np.sin(theta_rad)
+class Util:
+    @staticmethod
+    def parse_float_str(s, row_delim=";", col_delim=","):
+        # return [
+        #     [float(y) for y in x.strip().split(col_delim)]\
+        #     for x in s.strip().split(row_delim)]
+        try:
+            return [
+                [float(y) for y in x.strip().split(col_delim)]\
+                for x in s.strip().split(row_delim)]
+        except Exception as e:
+            print(str(e))
+            return []
 
 # generator funcs
 
@@ -83,6 +72,10 @@ def holes_along_axis_00(
     # .circle(d / 2).extrude(1.0)
 
 class GeoUtil:
+    @staticmethod
+    def polar_to_cartesian(x, y, r, theta_rad):
+        return x + r * np.cos(theta_rad), y + r * np.sin(theta_rad)
+
     @staticmethod
     def two_d_make_x_y_theta_hom(x, y, theta):
         hom = np.eye(3)
