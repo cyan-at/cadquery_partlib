@@ -17,38 +17,9 @@ import sys
 sys.path.insert(0,'..')
 from cadquery_common import *
 
-def slot_from(workplane, xy_a, xy_b, diameter, inclusive = True):
-    '''
-        reparameterizing the cq slot function
-        strategy is to get the xy midpoint of the xy_a and xy_b
-        get the angle of rotation
-        and feed those as the enter and angle parameters
-    '''
-    delta_x = xy_b[0] - xy_a[0]
-    delta_y = xy_b[1] - xy_a[1]
-    
-    '''
-    mid_xy = [
-        (delta_x) / 2.0,
-        (delta_y) / 2.0,
-    ]
-    '''    
-    # offset = 0.0 if not inclusive else 0
-    offset = 0.0 # irrespective of inclusive or not, just adjust length
-    mid_xy = GeoUtil.xyline_midpoint([xy_a, xy_b], offset)
-    norm = np.linalg.norm([delta_x, delta_y])
-    length = norm if not inclusive else norm + diameter
-    angle = np.arctan2(delta_y, delta_x) * 180.0 / np.pi
-    print(mid_xy)
-    print(length)
-    print(angle)
-
-    return workplane\
-        .pushPoints([mid_xy])\
-        .slot2D(
-            length,
-            diameter,
-            angle).cutBlind("last")
+def slot_from(xy_a, xy_b, diameter):
+    ''' reparameterizing the cq slot function '''
+    pass
 
 import argparse
 parser = argparse.ArgumentParser()
@@ -94,9 +65,6 @@ drake_hole_spacing = 70.0 / 2
 drake_holes = np.array([
     [center_xy2[0] - drake_hole_spacing, center_xy2[1], 4.0, -0.5],
     [center_xy2[0] + drake_hole_spacing, center_xy2[1], 4.0, -0.5],
-    
-    [center_xy2[0] - drake_hole_spacing, 70.0, 4.0, -0.5],
-    [center_xy2[0] + drake_hole_spacing, 70.0, 4.0, -0.5],
 ])
 cartesian_data = np.vstack([
     cartesian_data, 
@@ -106,7 +74,7 @@ cartesian_data = np.vstack([
 # pre-emptive hole set 1
 center_xy = [25.0, 0] # can't use 15 because of singularity somewhere?
 spacing_x = 25.0
-spacing_y = 15.0
+spacing_y = 20.0
 delta = np.array([[center_xy[0] - spacing_x, center_xy[1] - spacing_y, 3.0, -0.5],
     [center_xy[0] - spacing_x, center_xy[1] + spacing_y, 3.0, -0.5],
     [center_xy[0] + spacing_x, center_xy[1] - spacing_y, 3.0, -0.5],
@@ -163,8 +131,6 @@ slot_center_xy[1] += 20.0
 result = result.faces(">Z").workplane()\
     .pushPoints([slot_center_xy])\
     .slot2D(30.0, 10.0, 90.0).cutBlind("last")
-    
-result = slot_from(result, [0.0, 0.0], [0.0, 10.0], 4.0, inclusive = True)
 
 #################################################################### produce
 

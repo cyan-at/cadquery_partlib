@@ -3,28 +3,6 @@
 import numpy as np
 import math
 
-# geometry funcs
-
-def make_a_f(xy_l, xy_r, r):
-    '''
-         c        d
-    b   xy_l    xy_r    e
-         a        f
-    '''
-    a = [xy_l[0], xy_l[1] - r]
-    b = [xy_l[0] - r, xy_l[1]]
-    c = [xy_l[0], xy_l[1] + r]
-    d = [xy_r[0], xy_r[1] + r]
-    e = [xy_r[0] + r, xy_r[1]]
-    f = [xy_r[0], xy_r[1] - r]
-    return a, b, c, d, e, f
-
-# unit conversions to normalize before uniform scaling
-mm_to_m = 1 / 1000.0
-cm_to_m = 1 / 100.0
-in_to_mm = 25.4
-mm_to_in = 0.0393701
-
 class Util:
     @staticmethod
     def parse_float_str(s, row_delim=";", col_delim=","):
@@ -39,39 +17,36 @@ class Util:
             print(str(e))
             return []
 
-# generator funcs
-
-def holes_along_axis_00(
-        workplane,
-        axis_proxy,
-        axis_dim,
-        axis_width,
-
-        side_spacing,
-        num_holes,
-        
-        d):
-    # this function see internal semantics as such:
-    # num_holes = 1 means one hole on flank0, 2 means holes @ flank0,1
-    # > 2 means holes linspaced in the middle
-
-    hole_variants = np.linspace(
-        side_spacing,
-        axis_width - side_spacing,
-        num_holes)# should have at least 2 for the sides
-    
-    # spread hole variants along axis_dim, every other value is
-    # left axis_proxy
-    holes =\
-        np.ones((num_holes, len(axis_proxy))) * axis_proxy
-    holes[:, axis_dim] = -1.0 * hole_variants
-    
-    return workplane.moveTo(0.0, 0.0)\
-    .pushPoints(holes.tolist())\
-    .hole(d)
-    # .circle(d / 2).extrude(1.0)
-
 class GeoUtil:
+    @staticmethod
+    def fit_line_to_two_xy(two_xy):
+        assert(len(two_xy) == 2)
+        f_xy = two_xy[0]
+        l_xy = two_xy[1]
+        ris = l_xy[1] - f_xy[1]
+        run = l_xy[0] - f_xy[0]
+        if run == 0: # vertical lines
+            print("vertical line")
+            raise Exception("vl")
+        m = ris / run
+        # y = mx + b => b = y - mx
+        b = f_xy[1] - m * f_xy[0]
+        return [m, b]
+
+    @staticmethod
+    def xyline_midpoint(xy_line, offset = 0.0):
+        # xy_line is list[2][2]
+        try:
+            m_and_b = GeoUtil.fit_line_to_two_xy(xy_line)
+        except Exception as e:
+            if (str(e)) == "vl":
+                print("vl found")
+                return [xy_line[0][0], (xy_line[0][1] + xy_line[1][1]) / 2.0 + offset]
+        xs = list(map(lambda x: float(x[0]), xy_line)) # float is key
+        avg_x = sum(xs) / len(xs)
+        y = m_and_b[0]*(avg_x + offset) + m_and_b[1]
+        return [(avg_x + offset), y]
+
     @staticmethod
     def polar_to_cartesian(x, y, r, theta_rad):
         return x + r * np.cos(theta_rad), y + r * np.sin(theta_rad)
@@ -223,6 +198,38 @@ class GeoUtil:
             new_hull.append(centroid + vec * factors[i])
         return new_hull
 
+# generator funcs
+
+def holes_along_axis_00(
+        workplane,
+        axis_proxy,
+        axis_dim,
+        axis_width,
+
+        side_spacing,
+        num_holes,
+        
+        d):
+    # this function see internal semantics as such:
+    # num_holes = 1 means one hole on flank0, 2 means holes @ flank0,1
+    # > 2 means holes linspaced in the middle
+
+    hole_variants = np.linspace(
+        side_spacing,
+        axis_width - side_spacing,
+        num_holes)# should have at least 2 for the sides
+    
+    # spread hole variants along axis_dim, every other value is
+    # left axis_proxy
+    holes =\
+        np.ones((num_holes, len(axis_proxy))) * axis_proxy
+    holes[:, axis_dim] = -1.0 * hole_variants
+    
+    return workplane.moveTo(0.0, 0.0)\
+    .pushPoints(holes.tolist())\
+    .hole(d)
+    # .circle(d / 2).extrude(1.0)
+
 def make_teardrop(workplane, x, y, sl, sd, sa, hd, depth):
     result = workplane.moveTo(x=x, y=y)
     result = result.slot2D(length = sl, diameter = sd, angle=sa) # diameter should != length
@@ -235,3 +242,56 @@ def make_teardrop(workplane, x, y, sl, sd, sa, hd, depth):
     result = result.circle(hd / 2).cutBlind(-depth) # extrude(dims["t"])
     
     return result
+
+def slot_from(workplane, xy_a, xy_b, diameter, inclusive = True):
+    '''
+        reparameterizing the cq slot function
+        strategy is to get the xy midpoint of the xy_a and xy_b
+        get the angle of rotation
+        and feed those as the enter and angle parameters
+    '''
+    delta_x = xy_b[0] - xy_a[0]
+    delta_y = xy_b[1] - xy_a[1]
+    
+    '''
+    mid_xy = [
+        (delta_x) / 2.0,
+        (delta_y) / 2.0,
+    ]
+    '''    
+    # offset = 0.0 if not inclusive else 0
+    offset = 0.0 # irrespective of inclusive or not, just adjust length
+    mid_xy = GeoUtil.xyline_midpoint([xy_a, xy_b], offset)
+    norm = np.linalg.norm([delta_x, delta_y])
+    length = norm if not inclusive else norm + diameter
+    angle = np.arctan2(delta_y, delta_x) * 180.0 / np.pi
+    print(mid_xy)
+    print(length)
+    print(angle)
+
+    return workplane\
+        .pushPoints([mid_xy])\
+        .slot2D(
+            length,
+            diameter,
+            angle).cutBlind("last")
+
+def make_a_f(xy_l, xy_r, r):
+    '''
+         c        d
+    b   xy_l    xy_r    e
+         a        f
+    '''
+    a = [xy_l[0], xy_l[1] - r]
+    b = [xy_l[0] - r, xy_l[1]]
+    c = [xy_l[0], xy_l[1] + r]
+    d = [xy_r[0], xy_r[1] + r]
+    e = [xy_r[0] + r, xy_r[1]]
+    f = [xy_r[0], xy_r[1] - r]
+    return a, b, c, d, e, f
+
+# unit conversions to normalize before uniform scaling
+mm_to_m = 1 / 1000.0
+cm_to_m = 1 / 100.0
+in_to_mm = 25.4
+mm_to_in = 0.0393701
