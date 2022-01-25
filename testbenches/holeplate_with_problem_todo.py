@@ -97,9 +97,11 @@ for k, v in dims.items():
 ##########################
 
 # make hull, inflate with radius, and fillet
+# 2022-01-15 looks like graham scan is not as reliable as jarvis march
+# TODO investigate why maybe there's a bug in graham scan
 hull = None
 try:
-    hull, q = GeoUtil.ch_graham_scan(cartesian_coords)
+    hull, _, _ = GeoUtil.ch_gift_wrapping_jarvis_march(cartesian_coords)
 except Exception as e:
     '''need to handle n = 1, n = 2 where no hull is possible'''
     print(e)
@@ -108,7 +110,7 @@ fs = [1.2] * len(hull)
 new_hull = GeoUtil.inflate_hull_00(hull, fs)
 
 result = cq.Workplane("front")
-result = result.polyline([x[:2] for x in new_hull]).close()
+result = result.polyline(new_hull).close()
 result = result.extrude(1.0)
 
 #result = cq.Workplane("XY" ).box(50, 50, dims["t"])
