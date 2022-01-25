@@ -17,39 +17,6 @@ import sys
 sys.path.insert(0,'..')
 from cadquery_common import *
 
-def slot_from(workplane, xy_a, xy_b, diameter, inclusive = True):
-    '''
-        reparameterizing the cq slot function
-        strategy is to get the xy midpoint of the xy_a and xy_b
-        get the angle of rotation
-        and feed those as the enter and angle parameters
-    '''
-    delta_x = xy_b[0] - xy_a[0]
-    delta_y = xy_b[1] - xy_a[1]
-    
-    '''
-    mid_xy = [
-        (delta_x) / 2.0,
-        (delta_y) / 2.0,
-    ]
-    '''    
-    # offset = 0.0 if not inclusive else 0
-    offset = 0.0 # irrespective of inclusive or not, just adjust length
-    mid_xy = GeoUtil.xyline_midpoint([xy_a, xy_b], offset)
-    norm = np.linalg.norm([delta_x, delta_y])
-    length = norm if not inclusive else norm + diameter
-    angle = np.arctan2(delta_y, delta_x) * 180.0 / np.pi
-    print(mid_xy)
-    print(length)
-    print(angle)
-
-    return workplane\
-        .pushPoints([mid_xy])\
-        .slot2D(
-            length,
-            diameter,
-            angle).cutBlind("last")
-
 import argparse
 parser = argparse.ArgumentParser()
 parser.add_argument('--scale',
@@ -89,14 +56,14 @@ cartesian_data = np.vstack([
 ])
 
 # drake 611 plate holes
-center_xy2 = [25.0, -20.0]
+drake_center = [25.0, -20.0]
 drake_hole_spacing = 70.0 / 2
 drake_holes = np.array([
-    [center_xy2[0] - drake_hole_spacing, center_xy2[1], 4.0, -0.5],
-    [center_xy2[0] + drake_hole_spacing, center_xy2[1], 4.0, -0.5],
+    [drake_center[0] - drake_hole_spacing, drake_center[1], 4.0, -0.5],
+    [drake_center[0] + drake_hole_spacing, drake_center[1], 4.0, -0.5],
     
-    [center_xy2[0] - drake_hole_spacing, 70.0, 4.0, -0.5],
-    [center_xy2[0] + drake_hole_spacing, 70.0, 4.0, -0.5],
+    [drake_center[0] - drake_hole_spacing, 70.0, 4.0, -0.5],
+    [drake_center[0] + drake_hole_spacing, 70.0, 4.0, -0.5],
 ])
 cartesian_data = np.vstack([
     cartesian_data, 
@@ -131,7 +98,7 @@ for k, v in dims.items():
 # make hull, inflate with radius, and fillet
 hull = None
 try:
-    hull, q = GeoUtil.ch_graham_scan(cartesian_coords)
+    hull, _, _ = GeoUtil.ch_gift_wrapping_jarvis_march(cartesian_coords)
 except Exception as e:
     '''need to handle n = 1, n = 2 where no hull is possible'''
     print(e)
@@ -163,8 +130,10 @@ slot_center_xy[1] += 20.0
 result = result.faces(">Z").workplane()\
     .pushPoints([slot_center_xy])\
     .slot2D(30.0, 10.0, 90.0).cutBlind("last")
-    
-result = slot_from(result, [0.0, 0.0], [0.0, 10.0], 4.0, inclusive = True)
+
+drake_slot_len = 70.0 - drake_holes[0][1]
+result = slot_from(result, drake_holes[0][:2], drake_holes[0][:2] + [0.0, drake_slot_len], 4.0, inclusive = True)
+result = slot_from(result, drake_holes[1][:2], drake_holes[1][:2] + [0.0, drake_slot_len], 4.0, inclusive = True)
 
 #################################################################### produce
 

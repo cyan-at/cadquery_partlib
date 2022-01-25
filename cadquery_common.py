@@ -141,6 +141,52 @@ class GeoUtil:
 
         return stack, stack[0]
 
+    @staticmethod
+    def two_d_eq(p1, p2):
+        if p1 is None:
+            return False
+        if p2 is None:
+            return False
+        return (p1[0] == p2[0]) and (p1[1] == p2[1])
+
+    @staticmethod
+    def find_next_gift_wrapping_point(hull_pts, not_hull_pts):
+        # returns the index within not_hull_pts
+        res = 0
+        for i in range(1, len(not_hull_pts)):
+            # if GeoUtil.two_d_left_of_line(
+            #     not_hull_pts[i],
+            #     hull_pts[-1], not_hull_pts[res]):
+            # ccw seems to work correctly instead of 'left'
+            if (GeoUtil.ccw(
+                hull_pts[-1],
+                not_hull_pts[res],
+                not_hull_pts[i]) > 0):
+                res = i
+        return res
+
+    @staticmethod
+    def ch_gift_wrapping_jarvis_march(ps):
+        # ps is a list of len(2) lists, 2d xys
+        not_hull_pts = sorted(ps, key=lambda x: x[0], reverse = True)
+        not_hull_indices = sorted(list(range(len(ps))),
+            key=lambda x: ps[x][0], reverse = True)
+        left_most_point = not_hull_pts[-1]
+        next_pt = None
+        hull_pts = []
+        hull_pt_indices = []
+        hull_pts.append(left_most_point)
+        hull_pt_indices.append(not_hull_indices[-1])
+        while not GeoUtil.two_d_eq(next_pt, left_most_point):
+            q_idx = GeoUtil.find_next_gift_wrapping_point(
+                hull_pts,
+                not_hull_pts)
+            q = not_hull_pts.pop(q_idx) # removes it as well
+            hull_pts.append(q)
+            hull_pt_indices.append(not_hull_indices.pop(q_idx))
+            next_pt = q # eventually next_pt -> left_most_point
+        return hull_pts, left_most_point, hull_pt_indices
+
     # https://www.seas.upenn.edu/~sys502/extra_materials/Polygon%20Area%20and%20Centroid.pdf
     @staticmethod
     def xy_closed_polygon_area(border_xys):
