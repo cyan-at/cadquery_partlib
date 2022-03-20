@@ -298,6 +298,14 @@ def make_teardrop_hole(workplane, x, y, sl, sd, sa, hd, depth):
     return result
 
 def gen_nema17holes(work, center_hom2d, args, dims):
+    '''
+        work: <solid>.faces(">Z").workplane().workplane().moveTo(x=0, y=0)
+        center_hom2d: 3x3 2d hom transform in origin frame
+        args: user args including scale
+        dims: dimensions
+
+        returns: solid with cuts
+    '''
     s = 31.0 * args.scale
     center_d = 22.0 * args.scale
     mount_d = 3.0 * args.scale

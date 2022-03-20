@@ -11,6 +11,7 @@ from cadquery_common import *
 
 ####################################################################
 
+'''
 def gen_nema17holes(work, center_hom2d, args, dims):
     s = 31.0 * args.scale
     center_d = 22.0 * args.scale
@@ -26,6 +27,7 @@ def gen_nema17holes(work, center_hom2d, args, dims):
     work = work.circle(center_d / 2).cutBlind(-10)
     
     return work
+'''
 
 ####################################################################
 
@@ -52,8 +54,8 @@ for k, v in dims.items():
     dims[k] = dims[k] * args.scale
 
 result = cq.Workplane("front")\
-    .box(length=dims["l"],
-         width=dims["w"],
+    .box(length=dims["w"],
+         width=dims["l"],
          height=dims["h"],
          centered=False)
 result = result.edges("|Z").fillet(dims["f"])
