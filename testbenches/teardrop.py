@@ -61,7 +61,7 @@ result = cq.Workplane("XY" ).box(50, 50, dims["t"])
 result = result.edges("|Z").fillet(dims["f"])
 result = result.faces(">Z").workplane()
 
-result = make_teardrop(result,
+result = make_teardrop_hole(result,
     0.0,
     0.0,
     dims["sl"],

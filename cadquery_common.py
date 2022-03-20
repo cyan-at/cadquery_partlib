@@ -276,7 +276,15 @@ def holes_along_axis_00(
     .hole(d)
     # .circle(d / 2).extrude(1.0)
 
-def make_teardrop(workplane, x, y, sl, sd, sa, hd, depth):
+def make_teardrop_hole(workplane, x, y, sl, sd, sa, hd, depth):
+    '''
+    x y : location
+    sl : slot length
+    sd : slot diameter
+    sa:  slot angle
+    hd : hole diameter
+    depth : cut depth
+    '''
     result = workplane.moveTo(x=x, y=y)
     result = result.slot2D(length = sl, diameter = sd, angle=sa) # diameter should != length
     result = result.cutBlind(-depth)
@@ -288,6 +296,22 @@ def make_teardrop(workplane, x, y, sl, sd, sa, hd, depth):
     result = result.circle(hd / 2).cutBlind(-depth) # extrude(dims["t"])
     
     return result
+
+def gen_nema17holes(work, center_hom2d, args, dims):
+    s = 31.0 * args.scale
+    center_d = 22.0 * args.scale
+    mount_d = 3.0 * args.scale
+    for h_delta in [-s/2, s/2]:
+        for v_delta in [-s/2, s/2]:
+            vec = np.array([h_delta, v_delta, 1.0])
+            transformed = np.dot(center_hom2d, vec)
+            
+            work = work.moveTo(x=transformed[0], y=transformed[1])
+            work = work.circle(mount_d / 2).cutBlind(-10) # extrude(dims["t"])
+    work = work.moveTo(x=center_hom2d[0, 2], y=center_hom2d[1, 2])
+    work = work.circle(center_d / 2).cutBlind(-10)
+    
+    return work
 
 def slot_from(workplane, xy_a, xy_b, diameter, inclusive = True):
     '''
