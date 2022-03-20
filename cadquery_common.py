@@ -276,7 +276,7 @@ def holes_along_axis_00(
     .hole(d)
     # .circle(d / 2).extrude(1.0)
 
-def make_teardrop_hole(workplane, x, y, sl, sd, sa, hd, depth):
+def cut_teardrop_hole(workplane, x, y, sl, sd, sa, hd, depth):
     '''
     x y : location
     sl : slot length
@@ -297,7 +297,7 @@ def make_teardrop_hole(workplane, x, y, sl, sd, sa, hd, depth):
     
     return result
 
-def gen_nema17holes(work, center_hom2d, args, dims):
+def cut_nema17holes(work, center_hom2d, args, dims):
     '''
         work: <solid>.faces(">Z").workplane().workplane().moveTo(x=0, y=0)
         center_hom2d: 3x3 2d hom transform in origin frame

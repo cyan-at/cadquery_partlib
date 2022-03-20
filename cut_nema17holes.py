@@ -11,8 +11,15 @@ from cadquery_common import *
 
 ####################################################################
 
-'''
-def gen_nema17holes(work, center_hom2d, args, dims):
+def cut_nema17holes(work, center_hom2d, args, dims):
+    '''
+        work: <solid>.faces(">Z").workplane().workplane().moveTo(x=0, y=0)
+        center_hom2d: 3x3 2d hom transform in origin frame
+        args: user args including scale
+        dims: dimensions
+
+        returns: solid with cuts
+    '''
     s = 31.0 * args.scale
     center_d = 22.0 * args.scale
     mount_d = 3.0 * args.scale
@@ -27,7 +34,6 @@ def gen_nema17holes(work, center_hom2d, args, dims):
     work = work.circle(center_d / 2).cutBlind(-10)
     
     return work
-'''
 
 ####################################################################
 
@@ -67,5 +73,5 @@ center_hom2d = GeoUtil.two_d_make_x_y_theta_hom(
     dims["l"] / 2,
     0 * np.pi / 180.0)
 
-result = gen_nema17holes(result, center_hom2d, args, dims)
+result = cut_nema17holes(result, center_hom2d, args, dims)
 
