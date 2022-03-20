@@ -318,7 +318,9 @@ def cut_nema17holes(work, center_hom2d, args, dims):
             work = work.circle(mount_d / 2).cutBlind(-10) # extrude(dims["t"])
     work = work.moveTo(x=center_hom2d[0, 2], y=center_hom2d[1, 2])
     work = work.circle(center_d / 2).cutBlind(-10)
-    
+
+    # move back to origin
+    work = work.moveTo(0, 0)
     return work
 
 def slot_from(workplane, xy_a, xy_b, diameter, inclusive = True):
