@@ -244,6 +244,17 @@ class GeoUtil:
             new_hull.append(centroid + vec * factors[i])
         return new_hull
 
+    @staticmethod
+    def cartesian_to_polar(x, y):
+        '''
+        returns r, theta
+        '''
+        return np.linalg.norm([x, y]), np.arctan2(y, x)
+
+    @staticmethod
+    def polar_to_cartesian(r, theta_rad, x = 0, y = 0):
+        return x + r * np.cos(theta_rad), y + r * np.sin(theta_rad)
+
 # generator funcs
 
 def holes_along_axis_00(
