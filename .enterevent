@@ -1,9 +1,4 @@
-#!/bin/sh
+#!/bin/bash
 
-echo "hello, sourcing miniconda"
-
-# cd ../../
-# echo $(pwd)
-# source ./miniconda/bin/activate
-
-
+echo "hello, starting cadquery"
+conda activate cadquery

@@ -52,9 +52,9 @@ parser.add_argument('--scale',
     type=float,
     default=1.0,
     required=False)
-parser.add_argument('--o',
-    type=str,
-    default="holeplate")
+# parser.add_argument('--o',
+#     type=str,
+#     default="holeplate")
 
 #############################################
 
@@ -149,7 +149,10 @@ for coord in cartesian_data:
 # except Exception as e:
 #     print("failed to render", str(e))
 
-if len(args.o) > 0:
-    cq.exporters.export(result,"./%s.stl" % (args.o))
-    cq.exporters.export(result.section(),"./%s.dxf" % (args.o))
-    print("saved %s" % (args.o))
+# name = args.o
+root, _ = os.path.splitext(args.holes)
+name = os.path.basename(root)
+
+cq.exporters.export(result,"./%s.stl" % (name))
+cq.exporters.export(result.section(),"./%s.dxf" % (name))
+print("saved %s" % (name))
