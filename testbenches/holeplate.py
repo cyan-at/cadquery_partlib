@@ -2,7 +2,6 @@
 
 '''
 USAGE: ./holeplate.py
-    --o name_of_part
     --scale
 
     --radius
@@ -10,8 +9,8 @@ USAGE: ./holeplate.py
     --hull
 
     --holes <list of cartesian coords> (x, y, diameter, depth)
-i.e.
 
+    o8EzbZ
 '''
 
 import numpy as np, math

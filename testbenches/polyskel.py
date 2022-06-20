@@ -636,6 +636,8 @@ def polygon_offset(cw_hull_pts, factor):
   >= 1 (no contour)
   < 1 >= 0 (inside polygon)
   < 0 (outside polygon)
+
+  o8EzbZ
   '''
 
   # even though it says 'ccw', it really wants polygon in 'cw' order
