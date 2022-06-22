@@ -1,4 +1,5 @@
 #!/bin/bash
 
 echo "hello, starting cadquery"
+start_conda
 conda activate cadquery
