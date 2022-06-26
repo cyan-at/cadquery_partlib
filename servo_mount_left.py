@@ -1,6 +1,7 @@
 import cadquery as cq
 
 M3 = 3 - 2 * 0.1
+M4 = 4 - 2 * 0.1
 M5 = 5 - 2 * 0.1
 
 ###########################################################
@@ -52,9 +53,15 @@ for dx in [-fastener_dx / 2, fastener_dx / 2]:
     for dy in [-fastener_dy / 2, fastener_dy / 2]:
         x = x_center + dx
         y = y_center + dy
+
         result = result.faces(">Z").workplane()\
         .pushPoints([[x, y]])\
         .hole(fastener_dia)
+        
+        # counter bore it so fastener head sits flush
+        result = result.faces(">Z").workplane()\
+        .pushPoints([[x, y]])\
+        .hole(fastener_dia + 4, depth = 3.5)
 
 ###########################################################
 

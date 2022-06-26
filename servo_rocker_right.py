@@ -2,37 +2,43 @@ import numpy as np
 
 import cadquery as cq
 
-X = 0
-Y = 1
-DIA = 2
-DEPTH = 3
+from servo_rocker_left import X, Y, DIA, DEPTH
+from servo_rocker_left import M3, M4, M5
+from servo_rocker_left import left, right, margin_left, margin_right, length, height, thickness
 
-M3 = 3
-M4 = 4 - 2*0.1
-M5 = 5
+############################################
 
-# The dimensions of the box. These can be modified rather than changing the
-# object's code directly.
-length = 116.0
-height = 20.0
-thickness = 10.0
+result = cq.Workplane("XY")\
+    .moveTo((left - margin_left), -height / 2)\
+    .box(length, height, thickness, centered=False)
 
-# Create a box based on the dimensions above and add a 22mm center hole
-result = cq.Workplane("XY").moveTo(-length / 2, -height / 2).box(85, height, thickness, centered=False)
+############################################
 
 # shave the sides
-result = result.faces(">Z").workplane().moveTo(length / 2, -height / 2).rect(90.0, 20.0).cutBlind(-height)
-result = result.faces(">Z").workplane().moveTo(-length / 2, -height / 2).rect(35.0, 20.0).cutBlind(-height)
+# non-horn side
+result = result.faces(">Z").workplane()\
+    .moveTo((right + margin_right) * 0.9, -height * 0.4)\
+    .rect(length * 0.65, height)\
+    .cutBlind(-thickness)
 
+# horn side
+result = result.faces(">Z").workplane()\
+    .moveTo((left - margin_left) * 0.9, -height * 0.4)\
+    .rect(length * 0.75, height)\
+    .cutBlind(-thickness)
+
+############################################
+
+'''
 result = result\
     .faces(">Z")\
     .workplane()\
     .moveTo(y=0, x=-23)\
     .slot2D(length=28, diameter=15, angle=0)\
     .cutBlind(-thickness)
+'''
 
-# servo horn groove
-# result = result.faces(">Z").workplane().moveTo(0, 0).circle(8).cutBlind(-5)
+############################################
 
 # servo horn holes
 axis = [0.0]
@@ -51,10 +57,19 @@ for coord in holes:
         .pushPoints([[x, y]])\
         .hole(coord[DIA])
 
+############################################
+
 # plate holes
-result = result.faces("<Y").workplane().moveTo(20, -5).hole(M4)
-result = result.faces("<Y").workplane().moveTo(-50, -5).hole(M4)
+result = result.faces("<Y").workplane()\
+    .moveTo(left, -thickness/2).hole(M4)
+
+result = result.faces("<Y").workplane()\
+    .moveTo(right, -thickness/2).hole(M4)
+
+############################################
 
 result =  result.edges("|Z").fillet(1.0)
+
+############################################
 
 cq.exporters.export(result,"./%s.stl" % ("rocker_right"))
