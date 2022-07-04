@@ -7,8 +7,9 @@ USAGE: ./2020_mount.py
     --bottom_shave (if equal to dz, it will add a bottom ledge)
     --length
     
-    ./2020_mount.py --backstop 0 --length 25
-    ./2020_mount.py --backstop 1 --length 40
+what i've made for laser
+    ./2020_mount.py --backstop 0 --length 30 --bottom_shave 4.0
+    ./2020_mount.py --backstop 1 --length 40 --bottom_shave 4.0
 '''
 
 import numpy as np, math
@@ -25,6 +26,21 @@ DEPTH = 3
 
 ############################################# deserialize, resolve all parameters
 
+# The dimensions of the box. These can be modified rather than changing the
+# object's code directly.
+marginx = 5.0
+dy = 20.0
+dz = 2.0
+ledge_thickness = dz
+
+marginx_endstop = 5
+marginy_endstop_0 = 0
+marginy_endstop_1 = 2
+dia_endstop = 2
+spacing_endstop = 14
+
+#############################################
+
 parser = argparse.ArgumentParser()
 
 parser.add_argument('--scale',
@@ -36,33 +52,21 @@ parser.add_argument('--backstop',
      type=int,
      default=0)
 
+# make this equal to dz to have the bottom ledge
 parser.add_argument('--bottom_shave',
      type=float,
      default=4.0)
 
 parser.add_argument('--length',
      type=float,
-     default=25.0)
-
-#############################################
+     default=30.0)
 
 args = parser.parse_args()
 
-# The dimensions of the box. These can be modified rather than changing the
-# object's code directly.
+#############################################
+
 dx = args.length
-marginx = 5.0
-dy = 20.0
-dz = 2.0
-ledge_thickness = dz
-
 bottom_shave = args.bottom_shave
-
-marginx_endstop = 5
-marginy_endstop_0 = 0
-marginy_endstop_1 = 2
-dia_endstop = 2
-spacing_endstop = 14
 
 #############################################
 
@@ -131,6 +135,6 @@ if args.backstop:
     
 result = result.edges("|Z").fillet(0.5)
 
-name = "2020_endstop_mount_%dmm_%d" % (int(args.length), args.backstop)
+name = "2020_endstop_mount_%dmm_%d_%d" % (int(args.length), args.backstop, int(args.bottom_shave))
 cq.exporters.export(result,"./%s.stl" % (name))
 print("saved %s" % (name))
