@@ -1,0 +1,48 @@
+conda is confused by PYTHONPATH, so:
+
+unset PYTHONPATH
+
+###########################################################
+
+conda base will not install python3.10 (yet?)
+
+https://stackoverflow.com/a/69524446
+so instead install it to environment:
+
+conda create --name py10 python=3.10 
+conda activate py10
+
+###########################################################
+
+conda looks for packages from anaconda.org
+
+on anaconda there are different channels (vendors) who offer the same packages but for different environments
+i.e.
+conda-forge has cadquery, only for 1.2.0 python2.7
+https://anaconda.org/conda-forge/cadquery/files
+vs.
+cadquery has cadquery, for python3.8, python3.9, python3.10
+https://anaconda.org/CadQuery/cadquery/files
+
+so you need to get the channel that offers the package for your desired environment:
+
+environment, python 3.10 (because of dataclasses dependency in cq-cam https://stackoverflow.com/questions/49908182/how-to-make-keyword-only-fields-with-dataclasses)
+so i need cadquery from the cadquery channel, NOT the conda-forge channel
+
+likewise for cq-editor
+
+(conda activate py10)
+conda install -c cadquery cadquery=master
+conda install -c cadquery cq-editor=master
+
+###########################################################
+
+you can also download the file off anaconda.org and install it by file:
+
+conda install /package-path/package-filename.tar.bz2
+
+###########################################################
+
+https://anaconda.org/conda-forge/opencamlib
+
+conda install -c conda-forge opencamlib

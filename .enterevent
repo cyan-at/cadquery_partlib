@@ -1,5 +1,30 @@
-#!/bin/bash
+#!/bin/bash -l
+
+<<setup
+source $HOME/miniforge/bin/activate
+conda create --name py10 python=3.10 
+conda activate py10
+
+cd cq-cam/
+pip install -e .
+
+conda install -c conda-forge opencamlib
+conda install -c cadquery cadquery=master
+conda install -c cadquery cq-editor=master
+setup
 
 echo "hello, starting cadquery"
-start_conda
-conda activate cadquery
+
+echo "unsetting PYTHONPATH to not confuse conda"
+unset PYTHONPATH
+
+echo "loading conda, doing what source /miniforge/bin/activate inside .enterevent"
+# source ~/miniforge/bin/activate
+# below is how you run equivalent of above 'source' inside .enterevent
+_CONDA_ROOT="/home/a/miniforge"
+. "$_CONDA_ROOT/etc/profile.d/conda.sh" || return $?
+# conda activate "$@"
+conda activate ""
+
+echo "loading py10 environment for cq_cam"
+conda activate py10
