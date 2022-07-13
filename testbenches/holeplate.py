@@ -20,6 +20,8 @@ import argparse
 
 import cadquery as cq
 
+import cq_cam
+
 sys.path.insert(0,'..')
 from cadquery_common import *
 import polyskel
@@ -152,6 +154,8 @@ for coord in cartesian_data:
 root, _ = os.path.splitext(args.holes)
 name = os.path.basename(root)
 
+'''
 cq.exporters.export(result,"./%s.stl" % (name))
 cq.exporters.export(result.section(),"./%s.dxf" % (name))
 print("saved %s" % (name))
+'''
