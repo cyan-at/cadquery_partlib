@@ -24,8 +24,23 @@ import pykml
 import matplotlib
 import matplotlib.pyplot as plt
 
-from printz import *
-from traverse_maker import *
+import math
+
+def read_file_into_list(file_path, line_handler):
+    lines = []
+    with open(file_path, 'r') as f:
+        lines = f.readlines()
+    result = []
+    for l in lines:
+        try:
+            r = line_handler(l)
+            result.append(r)
+        except:
+            continue
+    return result
+
+def line_handler(l):
+    return [float(x) for x in l.split(',')]
 
 def sort_and_get_indices(values_list):
     selected_indices = list(xrange(len(values_list)))
@@ -219,114 +234,12 @@ def prune_elbows(list_of_xys):
         i += 1
     return list_of_xys
 
-def pack_up_for_kml(list_of_globalxys, ah):
-    '''
-        list_of_globalxys: list, each element is a list[2] of globalx, globaly
-    '''
-    i = 0
-    while i < len(list_of_globalxys):
-
-        site_frame_x, site_frame_y = ah.site_frame_helper.globalframexy_to_siteframexy(
-            list_of_globalxys[i][0], list_of_globalxys[i][1])
-
-        lng, lat = ah.site_frame_helper.siteframexy_to_eastingnorthing(
-            site_frame_x,
-            site_frame_y) 
-        z = ah.get_globalframe_height(
-            list_of_globalxys[i][0],
-            list_of_globalxys[i][1])
-
-        list_of_globalxys[i].append(site_frame_x)
-        list_of_globalxys[i].append(site_frame_y)
-        list_of_globalxys[i].append(z)
-        list_of_globalxys[i].append(lng)
-        list_of_globalxys[i].append(lat)
-        i+=1
-    list_of_dicts = [{
-        "lng" : x[-2],
-        "lat" : x[-1],
-        "x" : x[0],
-        "y" : x[1],
-        "z" : x[2]
-    } for x in list_of_globalxys]
-    return list_of_dicts
-
-def main():
-    # script deserializes
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--dem",
-        help="dem",
-        required=True)
-    parser.add_argument("--kml",
-        type=str,
-        help="kml",
-        required=True)
-    parser.add_argument("--plot",
-        type=str,
-        help="plot",
-        default="h")
-
-    parser.add_argument("--output_dir",
-        help="directory to save files in",
-        default="~/Desktop/",
-        required=False)
-    parser.add_argument("--output_kml_name",
-        help="kml name",
-        default="site",
-        required=False)
-
-    args = parser.parse_args()
-    if not os.path.exists(
-        os.path.expanduser(args.dem)):
-        print("dem not found")
-
-        sys.exit(0)
-    if not os.path.exists(
-        os.path.expanduser(args.kml)):
-        print("kml,not found")
-        sys.exit(0)
-    kml_path = os.path.expanduser(args.kml)
-
-    doc = open(kml_path, 'rb')
-    doc = doc.read()
-    print(doc)
-
-    k = kml.KML()
-    k.from_string(doc)
-    placemarks = k._features[0]._features[0]._features[:-1]
-    # last one is linestring of all of them
-    lnglats = [[x.geometry.x, x.geometry.y] for x in placemarks]
-
-    site_frame_helper = SiteFrameHelper()
-    # dataset = gdal.Open(args.dem)
-    # ah = AltitudeHelper(site_frame_helper, dataset)
-
-    '''
-    # for quick querying site frame x,y,z
-    print site_frame_helper.eastingnorthing_to_siteframexy(
-        -47.283886051904972, 87.503357584169123)
-    print site_frame_helper.eastingnorthing_to_globalframexy(
-            -47.283886051904972, 87.503357584169123)
-    print ah.get_eastingnorthing_height(
-        -47.283886051904972, 87.503357584169123)
-    # -134.03435309086217, 114.98268177984573, 2.101447820663452
-    # 5063.72826
-    # -13070.27083
-    return
-    '''
-
-    ##### core algorithm
-    original_pts = []
-
+def polyline_buffer_strategy1(polyline_xys, params):
     border_1_lines = []
     border_1_pts = []
 
     border_2_lines = []
     border_2_pts = []
-
-    margin = [10]*(len(lnglats)-1) # for now margins are all 10
-    # for i in range(len(lnglats)-1):
-    #     margin[i] = max(10, 40-abs(len(lnglats)/2-i)*10)
 
     last_border_1_pt = None
     last_border_2_pt = None
@@ -336,34 +249,28 @@ def main():
     b1s = []
     b2s = []
 
-    for i in range(1, len(lnglats)): # for every segment
+    for i in range(1, len(polyline_xys)): # for every segment
         # from i-1 to i
         # get line endpoints
-        global_xy_a = site_frame_helper.eastingnorthing_to_globalframexy(
-            *lnglats[i-1])
-        if i == 1:
-            original_pts.append(list(global_xy_a))
+        xy_a = polyline_xys[i-1]
+        xy_b = polyline_xys[i]
 
-        global_xy_b = site_frame_helper.eastingnorthing_to_globalframexy(
-            *lnglats[i])
-        original_pts.append(list(global_xy_b))
-
-        line = fit_line_to_two_xy([global_xy_a, global_xy_b])
+        line = fit_line_to_two_xy([xy_a, xy_b])
 
         # get line eq, get perp line eq
-        perp_line_a = perp_m_and_b(line, global_xy_a)
-        perp_line_b = perp_m_and_b(line, global_xy_b)
+        perp_line_a = perp_m_and_b(line, xy_a)
+        perp_line_b = perp_m_and_b(line, xy_b)
 
         # get endpoints shifted by some 'margin' amt
         a1, a2 = xy_dist_away_along_line(
             perp_line_a,
-            global_xy_a,
-            margin[i-1])
+            xy_a,
+            params[i-1])
 
         b1, b2 = xy_dist_away_along_line(
             perp_line_b,
-            global_xy_b,
-            margin[i-1])
+            xy_b,
+            params[i-1])
 
         # shuffle around these
         # such that the as are closer to prior as
@@ -391,12 +298,12 @@ def main():
 
         if i == 1:
             border_1_pts.append(a1)
-        elif i == len(lnglats)-1:
+        elif i == len(polyline_xys)-1:
             last_border_1_pt = b1
 
         if i == 1:
             border_2_pts.append(a2)
-        elif i == len(lnglats)-1:
+        elif i == len(polyline_xys)-1:
             last_border_2_pt = b2
 
         # turn into new line eqs
@@ -424,12 +331,7 @@ def main():
             [a2s[-1], b2s[-1]]))
 
     # get all consecutive line intersection pts
-    for i in range(1, len(lnglats)-1):
-        # border_1_pts.append(a1s[i])
-        # border_1_pts.append(b1s[i])
-        # border_2_pts.append(a2s[i])
-        # border_2_pts.append(b2s[i])
-
+    for i in range(1, len(polyline_xys)-1):
         border_1_candidate = two_xy_line_intersect(
             border_1_lines[i-1],
             border_1_lines[i])
@@ -450,61 +352,24 @@ def main():
     border_1_pts = prune_elbows(border_1_pts)
     border_2_pts = prune_elbows(border_2_pts)
 
-    ##### produce
-    # border_1_list_of_dicts = pack_up_for_kml(border_1_pts, ah)
-    # next_kml_name, _ = Util.get_next_valid_name_increment(
-    #     os.path.expanduser(args.output_dir),
-    #     'border_1',
-    #     0,
-    #     '',
-    #     'kml')
-    # kml_str = build_kml_str(
-    #     args.output_kml_name + ":border_1",
-    #     args.output_kml_name + ":border_1",
-    #     [border_1_list_of_dicts],
-    #     default_placemark_format="border1-%d")
-    # f = open(next_kml_name, "w")
-    # f.write(kml_str)
-    # f.close()
+    return border_1_pts, border_2_pts
 
-    # border_2_list_of_dicts = pack_up_for_kml(border_2_pts, ah)
-    # next_kml_name, _ = Util.get_next_valid_name_increment(
-    #     os.path.expanduser(args.output_dir),
-    #     'border_2',
-    #     0,
-    #     '',
-    #     'kml')
-    # kml_str = build_kml_str(
-    #     args.output_kml_name + ":border_2",
-    #     args.output_kml_name + ":border_2",
-    #     [border_2_list_of_dicts],
-    #     default_placemark_format="border2-%d")
-    # f = open(next_kml_name, "w")
-    # f.write(kml_str)
-    # f.close()
+def main():
+    # script deserializes
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--plot",
+        type=str,
+        help="plot",
+        default="h")
 
-    # all together now
-    # original_list_of_dicts = pack_up_for_kml(original_pts, ah)
+    ##### core algorithm
+    global_xys = read_file_into_list('pts.txt', line_handler)
 
-    # next_kml_name, _ = Util.get_next_valid_name_increment(
-    #     os.path.expanduser(args.output_dir),
-    #     'combined',
-    #     0,
-    #     '',
-    #     'kml')
-    # border_1_list_of_dicts_prefixed = ["border1-%d"] + border_1_list_of_dicts
-    # border_2_list_of_dicts_prefixed = ["border2-%d"] + border_2_list_of_dicts
-    # kml_str = build_kml_str(
-    #     args.output_kml_name + ":combined",
-    #     args.output_kml_name + ":combined",
-    #     [
-    #         original_list_of_dicts,
-    #         border_1_list_of_dicts_prefixed,
-    #         border_2_list_of_dicts_prefixed
-    #     ])
-    # f = open(next_kml_name, "w")
-    # f.write(kml_str)
-    # f.close()
+    margin = [10]*(len(global_xys)-1) # for now margins are all 10
+    # for i in range(len(lnglats)-1):
+    #     margin[i] = max(10, 40-abs(len(lnglats)/2-i)*10)
+
+    border_1_pts, border_2_pts = polyline_buffer_strategy1(global_xys, margin)
 
     ##### produce
     colors = 'grcymk'
@@ -514,7 +379,7 @@ def main():
         adjustable='box')
     plt.title("padding a traverse with 2 kmls v1.1")
 
-    plt.plot([x[0] for x in original_pts], [x[1] for x in original_pts], '-o')
+    plt.plot([x[0] for x in global_xys], [x[1] for x in global_xys], '-o')
     plt.plot([x[0] for x in border_1_pts], [x[1] for x in border_1_pts], '-o')
     plt.plot([x[0] for x in border_2_pts], [x[1] for x in border_2_pts], '-o')
 
