@@ -46,3 +46,16 @@ conda install /package-path/package-filename.tar.bz2
 https://anaconda.org/conda-forge/opencamlib
 
 conda install -c conda-forge opencamlib
+
+###########################################################
+
+wget https://github.com/conda-forge/miniforge/releases/latest/download/Miniforge3-Linux-x86_64.sh -O miniforge.sh
+bash miniforge.sh -b -p $HOME/miniforge
+source $HOME/miniforge/bin/activate
+conda create --name py10 python=3.10 
+conda activate py10
+conda install -c cadquery cadquery=master
+conda install -c cadquery cq-editor=master
+
+conda install -c conda-forge opencamlib
+
