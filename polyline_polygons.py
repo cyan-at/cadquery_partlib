@@ -153,16 +153,26 @@ def twoxys_to_pillpolygon(s_xy, e_xy, t):
 class Container(object):
     def __init__(self, args):
         self.args = args
-        self.xys = []
-        self.line_segs = []
+        self.current_dia = None
+        self.xys = [] # a 'ragged' 2D matrix / table
 
     def read_polyline_point(self, line):
         tokens = line.split(",")
-        if len(tokens) != 2:
+
+        if len(tokens) > 3 or len(tokens) == 0:
+            print("bad line, skipping %s" % (line))
             return
 
-        e_xy = [float(x) for x in tokens]
-        self.xys.append(e_xy)
+        if len(tokens) == 1:
+            self.current_dia = float(tokens[0])
+            print("1 token, next lines are pills of diameter %.3f" % (
+                self.current_dia))
+        else:
+            # must be 2 or 3
+            dia_xy_andmaybeholedia = [self.current_dia]
+            dia_xy_andmaybeholedia.extend([float(x) for x in tokens])
+            print(dia_xy_andmaybeholedia)
+            self.xys.append(dia_xy_andmaybeholedia)
 
 if __name__ == '__main__':
     # parse command line
@@ -189,34 +199,35 @@ if __name__ == '__main__':
         adjustable='box')
 
     sc = ax.scatter(
-      [x[0] for x in container.xys],
       [x[1] for x in container.xys],
+      [x[2] for x in container.xys],
       c = [5 for x in container.xys]
     )
 
     ax.plot(
-        [x[0] for x in container.xys],
         [x[1] for x in container.xys],
+        [x[2] for x in container.xys],
     "k")
 
     polygons = []
     for i in range(len(container.xys)-1):
         polygon_pts = twoxys_to_pillpolygon(
-            container.xys[i],
-            container.xys[i+1],
-            args.t)
+            container.xys[i][1:3],
+            container.xys[i+1][1:3],
+            container.xys[i][0])
         polygons.append(polygon_pts)
 
-        # ax.plot(
-        #     [x[0] for x in polygon_pts],
-        #     [x[1] for x in polygon_pts],
-        # "k")
+        ax.plot(
+            [x[0] for x in polygon_pts],
+            [x[1] for x in polygon_pts],
+        "k")
 
         fname = "polygon_%d.dat" % (i)
         np.savetxt(fname, polygon_pts,
             fmt='%1.3e',
             newline=' ')
 
+    '''
     pc = pyclipper.Pyclipper()
 
     x = tuple([tuple(x) for x in polygons[0]])
@@ -244,5 +255,6 @@ if __name__ == '__main__':
         [x[0] for x in xys],
         [x[1] for x in xys],
     "k")
+    '''
 
     plt.show()
