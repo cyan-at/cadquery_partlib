@@ -5,8 +5,8 @@ given a 2d polyline of xys
 create a set of 2d pill polygons to union
 
 USAGE:
-./polyline_polygons.py
-./polyline_polygons.py --plot static
+./polyline_polygons.py --txt ./polyline.txt
+./polyline_polygons.py --txt ./polyline.txt --plot static
 '''
 
 import numpy as np
