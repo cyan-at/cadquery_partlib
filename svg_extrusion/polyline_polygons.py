@@ -159,7 +159,7 @@ def threept_arc(c_xy, s_xy, m_xy, e_xy, r, N=100):
 
     return np.vstack((xys1.T, xys2.T))
 
-def twoxys_to_pillpolygon(s_xy, e_xy, t):
+def twoxys_to_six_scaffold_pts(s_xy, e_xy, t):
     '''
     makes a polygon (list of xys) given a line
     and a parameter t
@@ -187,6 +187,33 @@ def twoxys_to_pillpolygon(s_xy, e_xy, t):
     g_origin_s2 = np.dot(g_origin_sxy, g_sxy_s2)
     g_origin_s4 = np.dot(g_origin_exy, g_exy_s4)
 
+    return [
+        g_origin_s5,
+
+        g_origin_s1,
+        g_origin_s3,
+
+        g_origin_s6,
+
+        g_origin_s4,
+        g_origin_s2,
+    ]
+
+def twoxys_to_pillpolygon(s_xy, e_xy, t):
+    '''
+    makes a polygon (list of xys) given a line
+    and a parameter t
+    '''
+
+    # 6 scaffold points
+    g_origin_s5,\
+    g_origin_s1,\
+    g_origin_s3,\
+    g_origin_s6,\
+    g_origin_s4,\
+    g_origin_s2 = twoxys_to_six_scaffold_pts(
+        s_xy, e_xy, t)
+
     # 6 scaffold points to polygon
     # arc between 2-5-1, 3-6-4
     # lines between 1-3 and 4-2
@@ -211,17 +238,6 @@ def twoxys_to_pillpolygon(s_xy, e_xy, t):
         g_origin_s4[:2,2].T,
         g_origin_s2[:2,2].T
     ))
-    # return [
-    #     g_origin_s5,
-
-    #     g_origin_s1,
-    #     g_origin_s3,
-
-    #     g_origin_s6,
-
-    #     g_origin_s4,
-    #     g_origin_s2,
-    # ]
 
 class Container(object):
     def __init__(self, args):
@@ -230,16 +246,20 @@ class Container(object):
         self.xys = [] # a 'ragged' 2D matrix / table
 
     def read_polyline_point(self, line):
-        tokens = line.split(",")
+        tokens = line.strip().split(",")
 
         if len(tokens) > 3 or len(tokens) == 0:
             print("bad line, skipping %s" % (line))
             return
 
         if len(tokens) == 1:
-            self.current_dia = float(tokens[0])
-            print("1 token, next lines are pills of diameter %.3f" % (
-                self.current_dia))
+            if tokens[0] == '':
+                print("disconnect found")
+                self.xys.append(None)
+            else:
+                self.current_dia = float(tokens[0])
+                print("1 token, next lines are pills of diameter %.3f" % (
+                    self.current_dia))
         else:
             # must be 2 or 3
             dia_xy_andmaybeholedia = [self.current_dia]
@@ -279,19 +299,26 @@ if __name__ == '__main__':
 
     for j in np.linspace(0.0, 5.0, samples):
         polygons = []
-        for i in range(len(container.xys)-1):
+
+        i = 0
+        while i < len(container.xys)-1:
+            if container.xys[i] is None or container.xys[i+1] is None:
+                i += 1
+                continue
+
             polygon_pts = twoxys_to_pillpolygon(
                 container.xys[i][1:3], # xy
                 container.xys[i+1][1:3], # xy
                 container.xys[i][0] + j) # diameter
             polygons.append(polygon_pts)
-
             '''
             fname = "polygon_%d.dat" % (i)
             np.savetxt(fname, polygon_pts,
                 fmt='%1.3e',
                 newline=' ')
             '''
+
+            i += 1
 
         contours.append(polygons)
 
@@ -300,8 +327,14 @@ if __name__ == '__main__':
     fig = plt.figure()
 
     # a 'viewport'
-    mean_x = np.mean([x[0] for x in container.xys])
-    mean_y = np.mean([x[1] for x in container.xys])
+
+    notnone_xys = []
+    for t in container.xys:
+        if t is not None:
+            notnone_xys.append(t)
+
+    mean_x = np.mean([x[0] for x in notnone_xys])
+    mean_y = np.mean([x[1] for x in notnone_xys])
     center = [mean_x, mean_y]
     dims = [10]*2
     ax = fig.add_subplot(
@@ -314,15 +347,21 @@ if __name__ == '__main__':
     camera = MatplotlibCamera(center, dims, ax)
 
     sc = ax.scatter(
-      [x[1] for x in container.xys],
-      [x[2] for x in container.xys],
-      c = [5 for x in container.xys]
+      [x[1] for x in notnone_xys],
+      [x[2] for x in notnone_xys],
+      c = [5 for x in notnone_xys]
     )
 
-    ax.plot(
-        [x[1] for x in container.xys],
-        [x[2] for x in container.xys],
-    "k")
+    i = 0
+    while i < len(container.xys)-1:
+        if container.xys[i] is None or container.xys[i+1] is None:
+            i += 1
+            continue
+        ax.plot(
+            [container.xys[i][1], container.xys[i+1][1]],
+            [container.xys[i][2], container.xys[i+1][2]],
+            )
+        i += 1
 
     ####################################
 
