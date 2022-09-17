@@ -3,12 +3,17 @@
 '''
 given a 2d polyline of xys
 create a set of 2d pill polygons to union
+
+USAGE:
+./polyline_polygons.py
+./polyline_polygons.py --plot static
 '''
 
 import numpy as np
 import time, sys, os
 import matplotlib.pylab as plt
 import argparse
+import matplotlib.animation as animation
 
 sys.path.insert(0,'/home/cyan3/Dev/jim/wall-sandbox-archive/utils_all/plotting')
 import tools_2d
@@ -17,6 +22,77 @@ sys.path.insert(0,'/home/cyan3/Dev/jim/wall-sandbox-archive/utils_all/')
 from utils import GeoUtil
 
 import pyclipper, ipdb
+
+
+class MatplotlibCamera(object):
+  def __init__(self, center, dims, ax):
+    self.center = center
+    self.dims = dims
+    self.ax = ax
+
+    self.x_bounds = [self.center[0] - dims[0], self.center[0] + dims[0]]
+
+  def update_cb(self, data):
+    if (data[0] < self.x_bounds[0] or data[0] > self.x_bounds[1]):
+      self.center[0] = data[0] + self.dims[0]
+      print('self.center[0]', self.center[0])
+      self.x_bounds = [self.center[0] - dims[0], self.center[0] + dims[0]]
+      self.ax.set_xlim(self.x_bounds)
+
+      xticks = np.linspace(self.x_bounds[0], self.x_bounds[1], 7)
+      self.ax.set_xticks(xticks)
+      pass
+
+class AnimationHelper(object):
+    def __init__(self, data):
+        self._data = data
+
+        self._data_gen_cb = None
+        self._render_cb = None
+
+    def init_plot(self, fig, ax, texts, camera):
+        raise NotImplementedError
+
+    def data_gen(self):
+        i = 0
+        while True:
+            i = (i + 1) % len(self._data)
+
+            if self._data_gen_cb is not None:
+                self._data_gen_cb(i)
+
+            yield i
+
+    def render(self, i):
+        raise NotImplementedError
+
+class ContourHelper(AnimationHelper):
+    def init_plot(self, fig, ax, texts, camera):
+        inner_most_polygons = self._data[0]
+
+        self._contours = []
+        for polygon in inner_most_polygons:
+            p, = ax.plot(
+                [x[0] for x in polygon],
+                [x[1] for x in polygon],
+                c='k',
+                linewidth=0.5)
+            self._contours.append(p)
+
+    def render(self, i):
+        c = self._data[i]
+
+        self._contours = []
+        for polygon in c:
+            p, = ax.plot(
+                [x[0] for x in polygon],
+                [x[1] for x in polygon],
+                c='k',
+                alpha=1-(i+1)/len(self._data),
+                linewidth=0.5)
+            self._contours.append(p)
+
+        return self._contours
 
 def read_file_to_cbs(file_path, cbs):
     with open(file_path, 'r') as f:
@@ -41,9 +117,6 @@ def two_d_make_x_y_theta_hom(x, y, theta):
     hom[0, 2] = x
     hom[1, 2] = y
     return hom
-
-flip_ccw_90 = two_d_make_x_y_theta_hom(0, 0, np.pi / 2)
-flip_cw_90 = two_d_make_x_y_theta_hom(0, 0, -np.pi / 2)
 
 def smallest(th2, th1):
     # https://stackoverflow.com/questions/1878907/the-smallest-difference-between-2-angles
@@ -178,25 +251,67 @@ if __name__ == '__main__':
     # parse command line
     parser = argparse.ArgumentParser(description='''
     ''')
+
     parser.add_argument('--txt',
         type=str,
         required=True,
         help='every line is an xy')
-    parser.add_argument('--t',
-        type=float,
-        default=0.1,
-        help='')
+
+
+    parser.add_argument('--plot', type=str, default="animation", help='')
+
+    parser.add_argument('--playback', type=float, default=1.0, help='')
+    parser.add_argument('--dt', type=float, default=0.02, help='')
 
     args = parser.parse_args()
 
+    ##################################################################### init_data
+
     container = Container(args)
 
-    read_file_to_cbs(args.txt, [container.read_polyline_point])
+    read_file_to_cbs(
+        args.txt,
+        [container.read_polyline_point])
 
-    fig, ax = plt.subplots()
+    contours = []
+
+    samples = 10 if args.plot == "static" else int(1 / args.dt)
+
+    for j in np.linspace(0.0, 5.0, samples):
+        polygons = []
+        for i in range(len(container.xys)-1):
+            polygon_pts = twoxys_to_pillpolygon(
+                container.xys[i][1:3], # xy
+                container.xys[i+1][1:3], # xy
+                container.xys[i][0] + j) # diameter
+            polygons.append(polygon_pts)
+
+            '''
+            fname = "polygon_%d.dat" % (i)
+            np.savetxt(fname, polygon_pts,
+                fmt='%1.3e',
+                newline=' ')
+            '''
+
+        contours.append(polygons)
+
+    #################################################################### init_plot
+
+    fig = plt.figure()
+
+    # a 'viewport'
+    mean_x = np.mean([x[0] for x in container.xys])
+    mean_y = np.mean([x[1] for x in container.xys])
+    center = [mean_x, mean_y]
+    dims = [10]*2
+    ax = fig.add_subplot(
+      xlim=(center[0] - dims[0], center[0] + dims[0]),
+      ylim=(center[1] - dims[1], center[1] + dims[1]))
+    ax.set_aspect('equal')
     ax.grid()
-    plt.gca().set_aspect('equal',
-        adjustable='box')
+    # ax.set_adjustable('box')
+
+    camera = MatplotlibCamera(center, dims, ax)
 
     sc = ax.scatter(
       [x[1] for x in container.xys],
@@ -209,23 +324,24 @@ if __name__ == '__main__':
         [x[2] for x in container.xys],
     "k")
 
-    polygons = []
-    for i in range(len(container.xys)-1):
-        polygon_pts = twoxys_to_pillpolygon(
-            container.xys[i][1:3],
-            container.xys[i+1][1:3],
-            container.xys[i][0])
-        polygons.append(polygon_pts)
+    ####################################
 
-        ax.plot(
-            [x[0] for x in polygon_pts],
-            [x[1] for x in polygon_pts],
-        "k")
+    if args.plot == "static":
+        for polygons in contours:
+            for i in range(len(polygons)):
+                ax.plot(
+                    [x[0] for x in polygons[i]],
+                    [x[1] for x in polygons[i]],
+                    "k")
+    else:
+        system = ContourHelper(contours)
 
-        fname = "polygon_%d.dat" % (i)
-        np.savetxt(fname, polygon_pts,
-            fmt='%1.3e',
-            newline=' ')
+        ani = animation.FuncAnimation(
+          fig,
+          system.render,
+          system.data_gen,
+          interval=args.dt*1000/args.playback,
+          blit=True)
 
     '''
     pc = pyclipper.Pyclipper()
