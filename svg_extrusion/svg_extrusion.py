@@ -1,243 +1,139 @@
 #!/usr/bin/env python3
 
 '''
-USAGE: ./svg_extrusion.py
-    --scale
+given a 2d polyline of xys
+create a set of 2d pill polygons to union
 
-    --radius
-    --thickness
-
-    --svg
+USAGE:
+./polyline_extrusion.py --txt ./polyline.txt
 '''
 
-import numpy as np, math
-import sys, os, time
-import select
+import numpy as np
+import time, sys, os
 import argparse
 
 import cadquery as cq
 
-sys.path.insert(0,'..')
-from cadquery_common import *
-
 import svgpathtools
 from svgpathtools import svg2paths2
 
-import matplotlib.pyplot as plt
-from matplotlib.patches import Arc
+from polyline_polygons import *
 
-class GeoUtil:
-    @staticmethod
-    def two_circle_intersection_points(x1, y1, r1, x2, y2, r2):
-        answers = []
+def xy_l2_norm(a, b):
+    return np.sqrt(
+        (a[0] - b[0])**2\
+        +\
+        (a[1] - b[1])**2)
 
-        # shorthand
-        c1 = x1**2 - x2**2
-        c2 = y1**2 - y2**2
-        c3 = r1**2 - r2**2
-        c4 = -2*(x1-x2)
-        c5 = -2*(y1-y2)
-        c6 = c1 + c2
+def hash_xy(xy):
+    return "%.2f_%.2f" % (xy[0], xy[1])
 
-        if c4 == 0 and c5 != 0:
-            # x1 == x2, y1 != y2, still more than 1 solution maybe
-            y_answer = (c3 - c6) / c5
-            c8 = x1**2 + (y_answer - y1)**2 - r1**2 # c term in quadratic eq
-            c9 = -2*x1 # b term in quadratic eq
+class SvgContainer(object):
+    def __init__(self, args):
+        self.args = args
 
-            term1 = math.sqrt(c9**2 - 4*c8)
-            answer_x_1 = (-c9 + term1) / 2.0
-            answer_1 = [answer_x_1, y_answer]
-            answers.append(answer_1)
+        self.all_xys = []
 
-            answer_x_2 = (-c9 - term1) / 2.0
-            answer_2 = [answer_x_2, y_answer]
-            answers.append(answer_2)
+        self.polylines = []
+        paths, attributes, svg_attributes =\
+            svg2paths2(args.svg)
+        for path, attribute in zip(paths, attributes):
+            polyline = [] # list of xys, broken by None
+            i = 0
+            while i < len(path):
+                if type(path[i]) == svgpathtools.path.Line:
+                    # xs = [path[i].start.real, path[i].end.real]
+                    # ys = [-path[i].start.imag, -path[i].end.imag]
+                    s_xy = [path[i].start.real, -path[i].start.imag]
+                    e_xy = [path[i].end.real, -path[i].end.imag]
 
-            return answers
-        elif c4 != 0 and c5 == 0:
-            # x1 != x2, y1 == y2, still more than 1 solution maybe
-            x_answer = (c3 - c6) / c4
-            c8 = y1**2 + (x_answer - x1)**2 - r1**2 # c term in quadratic eq
-            c9 = -2*y1 # b term in quadratic eq
+                    if len(polyline) == 0:
+                        polyline.append(s_xy)
 
-            term1 = math.sqrt(c9**2 - 4*c8)
-            answer_y_1 = (-c9 + term1) / 2.0
-            answer_1 = [x_answer, answer_y_1]
-            answers.append(answer_1)
+                        self.all_xys.append(s_xy)
+                    else:
+                        dist = xy_l2_norm(
+                            polyline[-1],
+                            s_xy)
+                        if dist > 1e-1:
+                            print("broken since s_xy != e_xy, %.3f" % (dist))
+                            polyline.append(None)
+                            polyline.append(s_xy)
 
-            answer_y_2 = (-c9 - term1) / 2.0
-            answer_2 = [x_answer, answer_y_2]
-            answers.append(answer_2)
+                    self.all_xys.append(e_xy)
 
-            return answers
-        elif c4 != 0 and c5 != 0:
-            c9 = (c3 - c6) / c4
-            c10 = -c5 / c4
+                    polyline.append(e_xy)
+                i += 1
+            if len(polyline) > 0:
+                # only add routes, loops assumed to not be valid routes
+                dist = xy_l2_norm(
+                    polyline[0],
+                    polyline[-1])
+                if dist < 1e-1:
+                    print("loop found")
+                else:
+                    self.polylines.append(polyline)
 
-            a = 1 + c10**2
-            b = 2*(c9-x1)*(c10) - 2*y1
-            c = (c9-x1)**2 + y1**2 - r1**2
-            # print("b**2 - 4*a*c", b**2 - 4*a*c
-            term0 = b**2 - 4*a*c
-            if term0 < 0:
-                return []
-            term1 = math.sqrt(term0)
+        # solve sometimes a path ends where another begins
+        # so we connect them
+        # TODO merge this logic into above iteration
+        polylines_as_dict = {}
+        # stick segments into one polyline, O(n)
+        s_xy_map = {}
+        e_xy_map = {}
+        for j in range(len(self.polylines)):
+            s_hash = hash_xy(self.polylines[j][0])
+            if s_hash in s_xy_map:
+                print("s_hash %s found already, this one has len %d" % (s_hash, len(self.polylines[j])))
+            s_xy_map[s_hash] = j
 
-            answer_y_1 = (-b + term1) / (2.0 * a)
-            answer_x_1 = c9 + c10*answer_y_1
-            answer_1 = [answer_x_1, answer_y_1]
-            answers.append(answer_1)
+            e_hash = hash_xy(self.polylines[j][-1])
+            e_xy_map[e_hash] = j
 
-            answer_y_2 = (-b - term1) / (2.0 * a)
-            answer_x_2 = c9 + c10*answer_y_2
-            answer_2 = [answer_x_2, answer_y_2]
-            answers.append(answer_2)
+            print("%d s_hash %s vs e_hash %s" % (j, s_hash, e_hash))
 
-            return answers
-        return []
+            polylines_as_dict[s_hash] = self.polylines[j]
+        print("%d polylines" % len(self.polylines))
+        for j in range(len(self.polylines)):
+            print("%d in polyline %i" % (len(self.polylines[j]), j))
+        for j in range(len(self.polylines)):
+            s_hash = hash_xy(self.polylines[j][0])
+            e_hash = hash_xy(self.polylines[j][-1])
+            print("%d s_hash %s vs e_hash %s" % (j, s_hash, e_hash))
 
-    @staticmethod
-    def find_arc_centerpoint(s_xytheta, e_xytheta, third_arc_xy, radius, threshold = 1e-3):
-        # need radius to determine the problem, as well as third_arc_xy
-        circle_1 = [s_xytheta[0], s_xytheta[1], radius]
-        circle_2 = [e_xytheta[0], e_xytheta[1], radius]
-        circles = circle_1 + circle_2
-        intersections = GeoUtil.two_circle_intersection_points(*circles)
-        if len(intersections) == 0:
-            return []
+            if e_hash in s_xy_map.keys():
+                print("found e_hash as someone's s")
 
-        # once you have intersections, determine which one is within the arc
-        # chord_m_and_b = GeoUtil.fit_line_to_two_xy([s_xytheta, e_xytheta])
-        # midpoint_x = reduce(lambda a, b: a + b, map(
-        #   lambda x: x[0], [s_xytheta, e_xytheta])) / 2.0
-        # midpoint_y = chord_m_and_b[0] * midpoint_x + chord_m_and_b[1]
-        # once you have the chord midpoint, you need to find point
-        # on the arc that intersects the line from center of arc to midpoint
-        # so now you have intersection1, chordmidpoint, arcintersection, intersection2
-        # whenever intersection the chordmidpoint is in between with arcintersection
-        # thats your archcenterpoint
+                # so now we need to make sure
+                # that the other polyline
+                # has a s_hash that
+                # is in e_xy_map for us
+                k = s_xy_map[e_hash]
+                other_s_hash = hash_xy(
+                    self.polylines[k][0])
+                k = e_xy_map[other_s_hash]
+                if k == j:
+                    print(len(polylines_as_dict[s_hash]))
+                    print(len(polylines_as_dict[e_hash]))
 
-        # alternatively, each intersection gives you a circle equation
-        # and you can just check that the third_arc_xy fits on that equation
+                    # connect: move their start to our end
+                    # note the 1: because the e_hash[0]
+                    # == s_hash[-1]
+                    polylines_as_dict[s_hash].extend(polylines_as_dict[e_hash][1:])
+                    del polylines_as_dict[e_hash]
+        self.polylines = [polylines_as_dict[x] for x in polylines_as_dict.keys()]
 
-        for intersection in intersections:
-            # check that (x-xc)**2 + (y-yc)**2 = r**2
-            lhs = (third_arc_xy[0] - intersection[0])**2 + (third_arc_xy[1] - intersection[1])**2
-            # print("lhs:", lhs)
-            # print("radius**2", radius**2)
-            # print("abs(lhs - radius**2)", abs(lhs - radius**2))
-            if abs(lhs - radius**2) < threshold:
-                # print("got it")
-                return intersection
+        # center all objects
+        self.cx = np.mean([q[0] for q in self.all_xys])
+        self.cy = np.mean([q[1] for q in self.all_xys])
+        for k in range(len(self.polylines)):
+            for j in range(len(self.polylines[k])):
+                self.polylines[k][j][0] -= self.cx
+                self.polylines[k][j][1] -= self.cy
 
-        # should not happen if arguments / problem is set up correctly
-        return []
-
-    @staticmethod
-    def cartesian_to_polar(x, y):
-        '''
-        returns r, theta
-        '''
-        return np.linalg.norm([x, y]), np.arctan2(y, x)
-
-def draw_path(fig, ax, path, attribute):
-    # print(attribute)
-    l = 1
-    if "stroke-width" in attribute:
-        l = max(l, float(attribute["stroke-width"]))
-    i = 0
-    last_el = None
-    while i < len(path):
-        if type(path[i]) == svgpathtools.path.Line:
-            xs = [path[i].start.real, path[i].end.real]
-            ys = [-path[i].start.imag, -path[i].end.imag]
-            ax.plot(xs, ys, linewidth=l)
-
-        elif type(path[i]) == svgpathtools.path.Arc:
-            # print("Arc found")
-            # import ipdb; ipdb.set_trace();
-
-            s_xytheta = [path[i].start.real, path[i].start.imag, 0.0]
-            e_xytheta = [path[i].end.real, path[i].end.imag, 0.0]
-            radius = path[i].radius.real
-
-            width = path[i].radius.real
-            height = path[i].radius.imag
-
-            if "rx" in attribute:
-                ax.add_patch(
-                    Arc((float(attribute["cx"]), -float(attribute["cy"])),
-                    float(attribute["rx"]),
-                    float(attribute["ry"]),
-                    0,
-                    theta1=0,
-                    theta2=360,
-                    linewidth=3.937,
-                    color='red')) # draw arc
-            elif "r" in attribute:
-                ax.add_patch(
-                    Arc((float(attribute["cx"]), -float(attribute["cy"])),
-                    float(attribute["r"]),
-                    float(attribute["r"]),
-                    0,
-                    theta1=0,
-                    theta2=360,
-                    linewidth=3.937,
-                    color='red')) # draw arc
-
-            # try:
-            #     center = GeoUtil.find_arc_centerpoint(s_xytheta, e_xytheta, s_xytheta, radius)
-
-            #     dx = s_xytheta[0] - center[0]
-            #     dy = s_xytheta[1] - center[1]
-            #     _, theta1 = GeoUtil.cartesian_to_polar(dx, dy)
-
-            #     dx = e_xytheta[0] - center[0]
-            #     dy = e_xytheta[1] - center[1]
-            #     _, theta2 = GeoUtil.cartesian_to_polar(dx, dy)
-
-            #     theta1 = theta1 * 180 / np.pi
-            #     theta2 = theta2 * 180 / np.pi
-
-            #     # Parameters
-            #     # xy(float, float)
-            #     # The center of the ellipse.
-
-            #     # widthfloat
-            #     # The length of the horizontal axis.
-
-            #     # heightfloat
-            #     # The length of the vertical axis.
-
-            #     # anglefloat
-            #     # Rotation of the ellipse in degrees (counterclockwise).
-
-            #     # theta1, theta2float, default: 0, 360
-            #     width = path[i].radius.real
-            #     height = path[i].radius.imag
-            #     ax.add_patch(
-            #         Arc((center[0], -center[1]),
-            #         width,
-            #         height,
-            #         0,
-            #         theta1=0,
-            #         theta2=360,
-            #         linewidth=1,
-            #         color='red')) # draw arc
-            # except Exception as e:
-            #     print(e)
-
-            if last_el is not None:
-                if type(last_el) == svgpathtools.path.Line:
-                    print("line to arc")
-
-        last_el = path[i]
-        i += 1
-
-#################################################################### deserialize, resolve all parameters
-
-parser = argparse.ArgumentParser()
+# parse command line
+parser = argparse.ArgumentParser(description='''
+''')
 
 parser.add_argument('--scale',
     type=float,
@@ -246,19 +142,25 @@ parser.add_argument('--scale',
 
 #############################################
 
-parser.add_argument('--radius',
-    type=float,
-    default=0.5)
-
-parser.add_argument('--thickness',
-    type=float,
-    default=6.0)
-
-#############################################
-
 parser.add_argument('--svg',
     type=str,
-    default="pcb_test.svg")
+    default="pcb_test.svg",
+    help='every line is an xy')
+
+parser.add_argument('--extrude',
+    type=float,
+    default=5.0,
+    help='')
+
+parser.add_argument('--route_diameter_thickness',
+    type=float,
+    default=3.0,
+    help='')
+
+parser.add_argument('--hole_dia',
+    type=float,
+    default=2.4,
+    help='')
 
 #############################################
 
@@ -266,25 +168,57 @@ args = parser.parse_args()
 
 #############################################
 
-paths, attributes, svg_attributes = svg2paths2(args.svg)
+container = SvgContainer(args)
 
-# dimensions, in mm, cadquery works in meters
-dims = {
-    "f" : args.radius, # fillet radius
-    "t" : args.thickness, # thickness
-}
-for k, v in dims.items():
-    dims[k] = dims[k] * args.scale
+#############################################
 
-####################################################################
+result = cq.Workplane("front")
 
-fig, ax = plt.subplots()
-ax.grid()
-ax.set_aspect('equal')
+extrude_dir = 1
 
-for i, path in enumerate(paths):
-    draw_path(fig, ax, path, attributes[i])
+for j in range(len(container.polylines)):
+    polyline = container.polylines[j]
 
-# import ipdb; ipdb.set_trace();
+    i = 0
+    while i < len(polyline)-1:
+        if polyline[i] is None or polyline[i+1] is None:
+            print("none found")
+            i += 1
+            continue
 
-plt.show()
+        scaffold_homs = twoxys_to_six_scaffold_pts(
+            polyline[i], # xy
+            polyline[i+1], # xy
+            args.route_diameter_thickness) # diameter
+        s5, s1, s3, s6, s4, s2 = [list(x[:2, 2]) for x in scaffold_homs]
+
+        # the CAD engine for cadquery cannot
+        # handle a large polyline in any form
+        # for some reason, so instead use their
+        # native calls
+        result = result.moveTo(*s2)
+        result = result.threePointArc(s5, s1)
+        result = result.lineTo(*s3)
+        result = result.threePointArc(s6, s4)
+        result = result.lineTo(*s2)
+        result = result.close()
+        result = result.extrude(args.extrude * extrude_dir)
+
+        i += 1
+
+result = result.faces(">Z").workplane()
+hole_pts = [polyline[0] for polyline in container.polylines]
+hole_pts.extend(
+    [polyline[-1] for polyline in container.polylines]
+)
+result = result.pushPoints(
+    hole_pts
+)
+result = result.hole(args.hole_dia)
+extrude_dir *= -1
+
+#############################################
+
+name = "polyline_extrusion"
+cq.exporters.export(result,"./%s.stl" % (name))
+print("saved %s" % (name))
